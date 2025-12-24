@@ -4,25 +4,21 @@ namespace App\Http\Controllers;
 
 use App\Models\Product;
 use Illuminate\Http\Request;
-use Inertia\Inertia; // ← Ku dar tan!
-
+use Illuminate\Support\Facades\Validator;
 
 class ProductController extends Controller
 {
     /**
      * Display a listing of the resource.
      */
- public function index()
+    public function index()
     {
-       return Inertia::render('Products/Index');
-    }
-
-    /**
-     * Show the form for creating a new resource.
-     */
-    public function create()
-    {
-        //
+        $products = Product::with('user')->get();
+        
+        return response()->json([
+            'success' => true,
+            'data' => $products,
+        ]);
     }
 
     /**
@@ -30,7 +26,37 @@ class ProductController extends Controller
      */
     public function store(Request $request)
     {
-        //
+        $validator = Validator::make($request->all(), [
+            'name' => 'required|string|max:255',
+            'description' => 'nullable|string',
+            'price' => 'required|numeric|min:0',
+            'featured_image' => 'nullable|string',
+            'featured_image_organizational_name' => 'nullable|string',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'errors' => $validator->errors(),
+            ], 422);
+        }
+
+        $product = Product::create([
+            'name' => $request->name,
+            'description' => $request->description,
+            'price' => $request->price,
+            'featured_image' => $request->featured_image,
+            'featured_image_organizational_name' => $request->featured_image_organizational_name,
+            'user_id' => $request->user()->id,
+        ]);
+
+        $product->load('user');
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Product created successfully',
+            'data' => $product,
+        ], 201);
     }
 
     /**
@@ -38,15 +64,12 @@ class ProductController extends Controller
      */
     public function show(Product $product)
     {
-        //
-    }
-
-    /**
-     * Show the form for editing the specified resource.
-     */
-    public function edit(Product $product)
-    {
-        //
+        $product->load('user');
+        
+        return response()->json([
+            'success' => true,
+            'data' => $product,
+        ]);
     }
 
     /**
@@ -54,14 +77,64 @@ class ProductController extends Controller
      */
     public function update(Request $request, Product $product)
     {
-        //
+        // Check if user owns the product
+        if ($product->user_id !== $request->user()->id) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Unauthorized. You can only update your own products.',
+            ], 403);
+        }
+
+        $validator = Validator::make($request->all(), [
+            'name' => 'sometimes|required|string|max:255',
+            'description' => 'nullable|string',
+            'price' => 'sometimes|required|numeric|min:0',
+            'featured_image' => 'nullable|string',
+            'featured_image_organizational_name' => 'nullable|string',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'errors' => $validator->errors(),
+            ], 422);
+        }
+
+        $product->update($request->only([
+            'name',
+            'description',
+            'price',
+            'featured_image',
+            'featured_image_organizational_name',
+        ]));
+
+        $product->load('user');
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Product updated successfully',
+            'data' => $product,
+        ]);
     }
 
     /**
      * Remove the specified resource from storage.
      */
-    public function destroy(Product $product)
+    public function destroy(Request $request, Product $product)
     {
-        //
+        // Check if user owns the product
+        if ($product->user_id !== $request->user()->id) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Unauthorized. You can only delete your own products.',
+            ], 403);
+        }
+
+        $product->delete();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Product deleted successfully',
+        ]);
     }
 }
