@@ -20,9 +20,6 @@ class AuthController extends Controller
             'email' => 'required|string|email|max:255|unique:users',
             'password' => 'required|string|min:4|confirmed',
             'password_confirmation' => 'required|string|min:4',
-        ], params: [
-            'password.confirmed' => 'The password confirmation does not match.',
-            'password_confirmation.required' => 'The password confirmation field is required.',
         ]);
 
         $user = User::create([
