@@ -5,7 +5,10 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use App\Models\User;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Cookie;
 use Illuminate\Validation\Rule;
+use Illuminate\Support\Facades\DB;
+
 
 class UserController extends Controller
 {
@@ -14,8 +17,8 @@ class UserController extends Controller
      */
     public function list()
     {
-        $users = User::with('products')->get();
-        
+        $users = User::all();
+
         return response()->json([
             'success' => true,
             'data' => $users,
@@ -27,12 +30,36 @@ class UserController extends Controller
      */
     public function show(User $user)
     {
-        $user->load('products');
-        
+        $user = User::find($user->id);
+
         return response()->json([
             'success' => true,
             'data' => $user,
         ]);
+    }
+
+
+
+    /**
+     * Register a new user
+     */
+    public function save(Request $request)
+    {
+
+
+        return DB::transaction(function () use ($request) {
+
+            $validateData = $this->validateUserData($request);
+
+            $user = User::create($validateData);
+
+            return response()->json([
+                'user' => $user,
+                'message' => 'User registered successfully',
+            ], 201);
+
+
+        });
     }
 
     /**
@@ -40,27 +67,32 @@ class UserController extends Controller
      */
     public function update(Request $request, User $user)
     {
-        $validatedData = $this->validateUserData($request, $user->id);
 
-        $user->update($validatedData);
-        $user->load('products');
+        return DB::transaction(function () use ($request, $user) {
 
-        return response()->json([
-            'success' => true,
-            'message' => 'User updated successfully',
-            'data' => $user,
-        ]);
+            $validateData = $this->validateUserData($request, $user);
+
+            $user->update($validateData);
+
+            $user = User::find($user->id);
+
+            return response()->json([
+                'data' => $user,
+                'message' => 'User updated successfully',
+            ]);
+
+        });
     }
 
     /**
      * Remove the specified user
      */
-    public function destroy(User $user)
+    public function destroy(User $user, $id)
     {
+        $user = User::find($user->id);
         $user->delete();
 
         return response()->json([
-            'success' => true,
             'message' => 'User deleted successfully',
         ]);
     }
@@ -68,74 +100,78 @@ class UserController extends Controller
     /**
      * Update the authenticated user's profile
      */
-    public function updateProfile(Request $request)
+    public function updateProfile(Request $request, User $user, $id)
     {
-        $user = $request->user();
-        $validatedData = $this->validateUserData($request, $user->id);
 
-        $user->update($validatedData);
-        $user->load('products');
 
-        return response()->json([
-            'success' => true,
-            'message' => 'Profile updated successfully',
-            'data' => $user,
-        ]);
+        return DB::transaction(function () use ($request, $user, $id) {
+            $user = User::find($id);
+            
+            $validateData = $this->validateUserData($request, $user);
+
+            $user->update($validateData);
+
+
+            return response()->json([
+                'data' => $user,
+                'message' => 'Profile updated successfully',
+            ]);
+
+        });
     }
 
     /**
      * Delete the authenticated user's account
      */
-    public function deleteProfile(Request $request)
+    public function deleteProfile(Request $request, User $user, $id)
     {
-        $user = $request->user();
+        $user = User::find($user->id);
         $user->delete();
 
         return response()->json([
-            'success' => true,
             'message' => 'Account deleted successfully',
         ]);
     }
 
-    /**
-     * Validate user data for update operations
-     *
-     * @param Request $request
-     * @param int|null $userId User ID to ignore in email uniqueness check
-     * @return array Validated and processed data ready for database update
-     */
-    private function validateUserData(Request $request, ?int $userId = null): array
+
+
+
+    protected function validateUserData(Request $request, User $user = null)
     {
+        // Build validation rules
         $rules = [
-            'name' => 'sometimes|required|string|max:255',
-            'email' => [
-                'sometimes',
-                'required',
-                'string',
-                'email',
-                'max:255',
-            ],
-            'password' => 'sometimes|required|string|min:4|confirmed',
-            'password_confirmation' => 'required_with:password|string|min:4',
+            'name' => 'required|string|max:255',
+            'email' => ['required', 'string', 'email', 'max:255'],
         ];
 
-        // Add email uniqueness rule if user ID is provided
-        if ($userId !== null) {
-            $rules['email'][] = Rule::unique('users')->ignore($userId);
+        // Password validation: required for new users, optional for updates
+        if ($user) {
+            // For updates, password is optional
+            $rules['password'] = 'sometimes|string|min:4|confirmed';
         } else {
-            $rules['email'][] = Rule::unique('users');
+            // For new users, password is required
+            $rules['password'] = 'required|string|min:4|confirmed';
         }
 
+        // For updates, ignore current user's email in uniqueness check
+        if ($user) {
+            $rules['email'][] = Rule::unique('users')->ignore($user->id);
+        } else {
+            // For new users, email must be unique
+            $rules['email'][] = 'unique:users';
+        }
+
+        // Validate the request and get validated data
         $validated = $request->validate($rules);
 
-        // Prepare data for update (exclude password_confirmation)
-        $data = $request->only(['name', 'email']);
-
-        // Hash password if provided
-        if ($request->filled('password')) {
-            $data['password'] = Hash::make($request->password);
+        // Hash the password if provided
+        if (isset($validated['password'])) {
+            $validated['password'] = Hash::make($validated['password']);
         }
 
-        return $data;
+        // Remove password_confirmation as it's only for validation
+        unset($validated['password_confirmation']);
+
+        return $validated;
     }
 }
