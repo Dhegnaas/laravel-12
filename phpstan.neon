@@ -1,0 +1,14 @@
+parameters:
+    level: 5
+    paths:
+        - app
+        - config
+        - database
+        - routes
+        - tests
+    excludePaths:
+        - vendor
+    ignoreErrors:
+        - '#Call to unknown method: Illuminate\\Database\\ConnectionInterface::getName\(\)#'
+        - '#Method getName\(\) not found in interface Illuminate\\Database\\ConnectionInterface#'
+

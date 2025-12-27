@@ -6,43 +6,28 @@ use Illuminate\Http\Request;
 use App\Models\User;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Cookie;
+use Illuminate\Contracts\Auth\Guard;
+use Illuminate\Support\Facades\RateLimiter;
+use Illuminate\Support\Facades\Session;
 use Illuminate\Validation\ValidationException;
+use Laravel\Sanctum\PersonalAccessToken;
 
 class AuthController extends Controller
 {
-    /**
-     * Register a new user
-     */
-    public function register(Request $request)
+
+    protected $auth;
+
+    public function __construct(Guard $auth)
     {
-        $request->validate([
-            'name' => 'required|string|max:255',
-            'email' => 'required|string|email|max:255|unique:users',
-            'password' => 'required|string|min:4|confirmed',
-            'password_confirmation' => 'required|string|min:4',
-        ]);
-
-        $user = User::create([
-            'name' => $request->name,
-            'email' => $request->email,
-            'password' => Hash::make($request->password),
-        ]);
-
-        $token = $user->createToken('auth_token')->plainTextToken;
-
-        return response()->json([
-            'message' => 'User registered successfully',
-            'user' => $user,
-            'token' => $token,
-        ], 201);
+        $this->auth = $auth;
     }
-
     /**
      * Login user and create token
      */
     public function login(Request $request)
     {
-        $request->validate([
+        $credentials = $request->validate([
             'email' => 'required|email',
             'password' => 'required',
         ]);
@@ -55,13 +40,23 @@ class AuthController extends Controller
             ]);
         }
 
-        $token = $user->createToken('auth_token')->plainTextToken;
+
+        if (Auth::attempt($credentials)) {
+            $token = $user->createToken('token')->plainTextToken;
+            $user = User::find(Auth::user()->id);
+            $cookies = Cookie::make('jwt', $token);
+            session([
+                'login_time' => now(),
+                'last_activity' => now()
+            ]);
+            return response()->json(['code' => 200, 'massage' => 'Authentication successful.', 'token' => $token], 200)->withCookie($cookies);
+
+        }
 
         return response()->json([
-            'message' => 'Login successful',
-            'user' => $user,
-            'token' => $token,
-        ]);
+            'message' => 'The provided credentials do not match our records.',
+        ], 422);
+
     }
 
     /**
@@ -69,11 +64,32 @@ class AuthController extends Controller
      */
     public function logout(Request $request)
     {
-        $request->user()->currentAccessToken()->delete();
+        try {
+            $user = Auth::user();
 
-        return response()->json([
-            'message' => 'Logged out successfully',
-        ]);
+            if (!$user) {
+                return response()->json(['message' => 'Unauthorized'], 401);
+            }
+          
+            PersonalAccessToken::where('tokenable_id', $user->id)
+                ->where('tokenable_type', 'App\Models\User')
+                ->delete();
+
+           
+            Session::flush();
+
+           
+            $cookie = Cookie::forget('jwt');
+
+
+            return response()->json(['message' => 'Logged out successfully.'], 200)->withCookie($cookie);
+            
+        } catch (\Throwable $th) {
+            return response()->json([
+                'message' => 'Logout failed.',
+                'error' => $th->getMessage()
+            ], 422);
+        }
     }
 
     /**
