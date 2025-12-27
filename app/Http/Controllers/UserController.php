@@ -68,6 +68,14 @@ class UserController extends Controller
     public function update(Request $request, User $user)
     {
 
+        $user = $request->user();
+
+        if (!$user) {
+            return response()->json([
+                'message' => 'Unauthorized',
+            ], 401);
+        }
+
         return DB::transaction(function () use ($request, $user) {
 
             $validateData = $this->validateUserData($request, $user);
@@ -75,6 +83,8 @@ class UserController extends Controller
             $user->update($validateData);
 
             $user = User::find($user->id);
+
+
 
             return response()->json([
                 'data' => $user,
@@ -100,17 +110,23 @@ class UserController extends Controller
     /**
      * Update the authenticated user's profile
      */
-    public function updateProfile(Request $request, User $user, $id)
+    public function updateProfile(Request $request)
     {
+        $user = $request->user();
 
+        if (!$user) {
+            return response()->json([
+                'message' => 'Unauthorized',
+            ], 401);
+        }
 
-        return DB::transaction(function () use ($request, $user, $id) {
-            $user = User::find($id);
-            
+        return DB::transaction(function () use ($request, $user) {
             $validateData = $this->validateUserData($request, $user);
 
             $user->update($validateData);
 
+            // Refresh the user model to get updated data
+            $user->refresh();
 
             return response()->json([
                 'data' => $user,
@@ -123,9 +139,16 @@ class UserController extends Controller
     /**
      * Delete the authenticated user's account
      */
-    public function deleteProfile(Request $request, User $user, $id)
+    public function deleteProfile(Request $request)
     {
-        $user = User::find($user->id);
+        $user = $request->user();
+
+        if (!$user) {
+            return response()->json([
+                'message' => 'Unauthorized',
+            ], 401);
+        }
+
         $user->delete();
 
         return response()->json([
