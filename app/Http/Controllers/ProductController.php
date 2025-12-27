@@ -4,7 +4,6 @@ namespace App\Http\Controllers;
 
 use App\Models\Product;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Validator;
 
 class ProductController extends Controller
 {
@@ -26,27 +25,10 @@ class ProductController extends Controller
      */
     public function store(Request $request)
     {
-        $validator = Validator::make($request->all(), [
-            'name' => 'required|string|max:255',
-            'description' => 'nullable|string',
-            'price' => 'required|numeric|min:0',
-            'featured_image' => 'nullable|string',
-            'featured_image_organizational_name' => 'nullable|string',
-        ]);
-
-        if ($validator->fails()) {
-            return response()->json([
-                'success' => false,
-                'errors' => $validator->errors(),
-            ], 422);
-        }
+        $validatedData = $this->validateProductData($request);
 
         $product = Product::create([
-            'name' => $request->name,
-            'description' => $request->description,
-            'price' => $request->price,
-            'featured_image' => $request->featured_image,
-            'featured_image_organizational_name' => $request->featured_image_organizational_name,
+            ...$validatedData,
             'user_id' => $request->user()->id,
         ]);
 
@@ -78,36 +60,13 @@ class ProductController extends Controller
     public function update(Request $request, Product $product)
     {
         // Check if user owns the product
-        if ($product->user_id !== $request->user()->id) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Unauthorized. You can only update your own products.',
-            ], 403);
+        $unauthorized = $this->authorizeProductAccess($request, $product);
+        if ($unauthorized) {
+            return $unauthorized;
         }
 
-        $validator = Validator::make($request->all(), [
-            'name' => 'sometimes|required|string|max:255',
-            'description' => 'nullable|string',
-            'price' => 'sometimes|required|numeric|min:0',
-            'featured_image' => 'nullable|string',
-            'featured_image_organizational_name' => 'nullable|string',
-        ]);
-
-        if ($validator->fails()) {
-            return response()->json([
-                'success' => false,
-                'errors' => $validator->errors(),
-            ], 422);
-        }
-
-        $product->update($request->only([
-            'name',
-            'description',
-            'price',
-            'featured_image',
-            'featured_image_organizational_name',
-        ]));
-
+        $validatedData = $this->validateProductData($request, true);
+        $product->update($validatedData);
         $product->load('user');
 
         return response()->json([
@@ -123,11 +82,9 @@ class ProductController extends Controller
     public function destroy(Request $request, Product $product)
     {
         // Check if user owns the product
-        if ($product->user_id !== $request->user()->id) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Unauthorized. You can only delete your own products.',
-            ], 403);
+        $unauthorized = $this->authorizeProductAccess($request, $product);
+        if ($unauthorized) {
+            return $unauthorized;
         }
 
         $product->delete();
@@ -136,5 +93,52 @@ class ProductController extends Controller
             'success' => true,
             'message' => 'Product deleted successfully',
         ]);
+    }
+
+    /**
+     * Validate product data for create/update operations
+     *
+     * @param Request $request
+     * @param bool $isUpdate Whether this is an update operation (uses 'sometimes' rules)
+     * @return array Validated data ready for database operations
+     */
+    private function validateProductData(Request $request, bool $isUpdate = false): array
+    {
+        $rules = [
+            'name' => ($isUpdate ? 'sometimes|' : '') . 'required|string|max:255',
+            'description' => 'nullable|string',
+            'price' => ($isUpdate ? 'sometimes|' : '') . 'required|numeric|min:0',
+            'featured_image' => 'nullable|string',
+            'featured_image_organizational_name' => 'nullable|string',
+        ];
+
+        $validated = $request->validate($rules);
+
+        return $request->only([
+            'name',
+            'description',
+            'price',
+            'featured_image',
+            'featured_image_organizational_name',
+        ]);
+    }
+
+    /**
+     * Check if the authenticated user owns the product
+     *
+     * @param Request $request
+     * @param Product $product
+     * @return \Illuminate\Http\JsonResponse|null Returns error response if unauthorized, null if authorized
+     */
+    private function authorizeProductAccess(Request $request, Product $product)
+    {
+        if ($product->user_id !== $request->user()->id) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Unauthorized. You can only modify your own products.',
+            ], 403);
+        }
+
+        return null;
     }
 }
