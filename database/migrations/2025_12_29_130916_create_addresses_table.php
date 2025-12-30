@@ -6,17 +6,15 @@ use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
-   
     public function up(): void
     {
         Schema::create('addresses', function (Blueprint $table) {
-            $table->id('add_no'); 
-            $table->foreignId('user_id')->constrained()->onDelete('cascade');
+            $table->id();
+            $table->foreignId('user_id')->constrained()->cascadeOnDelete();
             $table->string('country');
             $table->string('district');
             $table->string('location');
-            $table->string('area');
-
+            $table->string('area')->nullable();
             $table->timestamps();
         });
     }
