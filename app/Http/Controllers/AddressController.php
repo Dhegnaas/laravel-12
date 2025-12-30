@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Address;
+use DB;
 use Illuminate\Http\Request;
 
 class AddressController extends Controller
@@ -25,6 +26,7 @@ class AddressController extends Controller
      */
     public function store(Request $request)
     {
+        return DB::transaction(function () use ($request) {
         $validatedData = $this->validateAddressData($request);
 
         $address = Address::create([
@@ -38,7 +40,8 @@ class AddressController extends Controller
             'success' => true,
             'message' => 'Address created successfully',
             'data' => $address,
-        ], 201);    
+        ], 201);   
+    }); 
     }
 
     /**
@@ -46,8 +49,9 @@ class AddressController extends Controller
      */
     public function show(Address $address)
     {
+        $address = Address::find($address->id);
         $address->load('user');
-        
+
         return response()->json([
             'success' => true,
             'data' => $address,
@@ -59,10 +63,13 @@ class AddressController extends Controller
      */
     public function update(Request $request, Address $address)
     {
+
         $authorizationResponse = $this->authorizeAddressAccess($request, $address);
         if ($authorizationResponse) {
             return $authorizationResponse;
         }   
+
+        return DB::transaction(function () use ($request, $address) {
 
         $validatedData = $this->validateAddressData($request, true);
 
@@ -75,7 +82,9 @@ class AddressController extends Controller
             'message' => 'Address updated successfully',
             'data' => $address,
         ]);
-    }
+    }); 
+    } 
+
 
     /**
      * Remove the specified resource from storage.
@@ -86,6 +95,7 @@ class AddressController extends Controller
         if ($authorizationResponse) {
             return $authorizationResponse;
         }
+        $address = Address::find($address->id);
         $address->delete();
 
         return response()->json([
