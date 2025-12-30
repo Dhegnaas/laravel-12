@@ -5,6 +5,7 @@ use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\ProductController;
+use App\Http\Controllers\AddressController;
 
 
 // Public routes
@@ -30,4 +31,7 @@ Route::middleware('auth:sanctum')->group(function () {
     
     // Product routes
     Route::apiResource('products', ProductController::class);
+    // Address routes
+    Route::apiResource('addresses', AddressController::class);
+    
 });
