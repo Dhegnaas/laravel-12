@@ -13,10 +13,10 @@ class AddressController extends Controller
      */
     public function index()
     {
-        $addresses = Address::with('user')->get();
+        $address = Address::with('user')->get();
         return response()->json([
             'success' => true,
-            'data' => $addresses,
+            'data' => $address,
         ]);
 
     }
@@ -127,7 +127,7 @@ class AddressController extends Controller
         if ($address->user_id !== $request->user()->id) {
             return response()->json([
                 'success' => false,
-                'message' => 'Unauthorized. You can only modify your own addresses.',
+                'message' => 'Unauthorized. You can only modify your own address',
             ], 403);
         }
 

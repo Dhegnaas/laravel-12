@@ -32,6 +32,10 @@ Route::middleware('auth:sanctum')->group(function () {
     // Product routes
     Route::apiResource('products', ProductController::class);
     // Address routes
-    Route::apiResource('addresses', AddressController::class);
-    
+Route::get('/address', [AddressController::class, 'index']); // GET all addresses
+Route::post('/address', [AddressController::class, 'store']); // POST create new address
+Route::get('/address/{address}', [AddressController::class, 'show']); // GET single address
+Route::put('/address/{address}', [AddressController::class, 'update']); // PUT update address
+Route::patch('/address/{address}', [AddressController::class, 'update']); // PATCH update address
+Route::delete('/address/{address}', [AddressController::class, 'destroy']); // DELETE address   
 });
