@@ -31,11 +31,16 @@ Route::middleware('auth:sanctum')->group(function () {
     
     // Product routes
     Route::apiResource('products', ProductController::class);
-    // Address routes
-Route::get('/address', [AddressController::class, 'index']); // GET all addresses
-Route::post('/address', [AddressController::class, 'store']); // POST create new address
-Route::get('/address/{address}', [AddressController::class, 'show']); // GET single address
-Route::put('/address/{address}', [AddressController::class, 'update']); // PUT update address
-Route::patch('/address/{address}', [AddressController::class, 'update']); // PATCH update address
-Route::delete('/address/{address}', [AddressController::class, 'destroy']); // DELETE address   
+    // Address routes (Si gaar ah loo qoray, sidaad codsatay)
+    Route::get('/address', [AddressController::class, 'index']);
+    Route::post('/address', [AddressController::class, 'store']);
+    Route::get('/address/{address}', [AddressController::class, 'show']);
+    Route::put('/address/{address}', [AddressController::class, 'update']);
+    Route::patch('/address/{address}', [AddressController::class, 'update']);
+    Route::delete('/address/{address}', [AddressController::class, 'destroy']);
+
+    // Address Status management
+    Route::post('/address/{address}/submit', [AddressController::class, 'submit']);
+    Route::post('/address/{address}/cancel', [AddressController::class, 'cancel']);
+
 });

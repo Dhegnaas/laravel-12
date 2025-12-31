@@ -3,135 +3,152 @@
 namespace App\Http\Controllers;
 
 use App\Models\Address;
-use DB;
 use Illuminate\Http\Request;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Validation\Rule;
 
 class AddressController extends Controller
 {
     /**
-     * Display a listing of the resource.
+     * Tusi dhammaan cinwaannada (Latest First + Pagination)
      */
-    public function index()
+    public function index(): JsonResponse
     {
-        $address = Address::with('user')->get();
+        $addresses = Address::with('user:id,name,email')
+            ->latest()
+            ->paginate(10);
+
         return response()->json([
             'success' => true,
-            'data' => $address,
+            'data' => $addresses
         ]);
-
     }
-
     /**
-     * Store a newly created resource in storage.
+     * Display the specified resource (hal cinwaan oo gaar ah).
      */
-    public function store(Request $request)
+    public function show(Address $address): JsonResponse
     {
-        return DB::transaction(function () use ($request) {
-        $validatedData = $this->validateAddressData($request);
-
-        $address = Address::create([
-            ...$validatedData,
-            'user_id' => $request->user()->id,
-        ]);
-
-        $address->load('user');
-
+        // Waxay soo celinaysaa cinwaanka la codsaday, oo ay la socoto xogta qofka iska leh (user)
         return response()->json([
             'success' => true,
-            'message' => 'Address created successfully',
-            'data' => $address,
-        ], 201);   
-    }); 
-    }
-
-    /**
-     * Display the specified resource.
-     */
-    public function show(Address $address)
-    {
-        $address = Address::find($address->id);
-        $address->load('user');
-
-        return response()->json([
-            'success' => true,
-            'data' => $address,
+            'data' => $address->load('user:id,name,email'),
         ]);
     }
 
     /**
-     * Update the specified resource in storage.
+     * Kaydi cinwaan cusub (Default Status: Draft)
      */
-    public function update(Request $request, Address $address)
+    public function store(Request $request): JsonResponse
     {
+        $validated = $this->validateRequest($request);
 
-        $authorizationResponse = $this->authorizeAddressAccess($request, $address);
-        if ($authorizationResponse) {
-            return $authorizationResponse;
-        }   
+        return DB::transaction(function () use ($validated) {
+            // Halkan ayaan si sax ah u isticmaalnay relationship-ka addresses()
+            $address = Auth::user()->addresses()->create([
+                ...$validated,
+                'status' => 'draft'
+            ]);
 
-        return DB::transaction(function () use ($request, $address) {
+            return response()->json([
+                'success' => true,
+                'message' => 'Address created as draft',
+                'data' => $address->load('user:id,name')
+            ], 201);
+        });
+    }
 
-        $validatedData = $this->validateAddressData($request, true);
+    /**
+     * Cusboonaysii cinwaanka (Cidda iska leh kaliya)
+     */
+    public function update(Request $request, Address $address): JsonResponse
+    {
+        $this->authorizeOwner($address);
 
-        $address->update($validatedData);
+        $validated = $this->validateRequest($request, true);
 
-        $address->load('user');
+        $address->update($validated);
 
         return response()->json([
             'success' => true,
             'message' => 'Address updated successfully',
-            'data' => $address,
+            'data' => $address->refresh()
         ]);
-    }); 
-    } 
-
+    }
 
     /**
-     * Remove the specified resource from storage.
+     * Status Change: Submit
      */
-    public function destroy(Address $address)
+    public function submit(Address $address): JsonResponse
     {
-        $authorizationResponse = $this->authorizeAddressAccess(request(), $address);
-        if ($authorizationResponse) {
-            return $authorizationResponse;
-        }
-        $address = Address::find($address->id);
+        return $this->updateStatus($address, 'submitted');
+    }
+
+    /**
+     * Status Change: Cancel
+     */
+    public function cancel(Address $address): JsonResponse
+    {
+        return $this->updateStatus($address, 'canceled');
+    }
+
+    /**
+     * Tirtirid (Cidda iska leh kaliya)
+     */
+    public function destroy(Address $address): JsonResponse
+    {
+        $this->authorizeOwner($address);
+        
         $address->delete();
 
         return response()->json([
             'success' => true,
-            'message' => 'Address deleted successfully',
+            'message' => 'Address deleted successfully'
         ]);
     }
-    private function validateAddressData(Request $request, bool $isUpdate = false): array
+
+    // --- HELPER METHODS ---
+
+    /**
+     * Hubinta Amniga: User-ka ma iska leh xogtan?
+     */
+    private function authorizeOwner(Address $address): void
+    {
+        if ($address->user_id !== Auth::id()) {
+            abort(response()->json(['message' => 'Unauthorized Access'], 403));
+        }
+    }
+
+    /**
+     * Hubinta Xogta (Validation)
+     */
+    private function validateRequest(Request $request, bool $isUpdate = false): array
     {
         $rules = [
-            'country' => ($isUpdate ? 'sometimes|' : '') . 'required|string|max:255',
-            'district' => ($isUpdate ? 'sometimes|' : '') . 'required|string|max:255',
-            'location' => ($isUpdate ? 'sometimes|' : '') . 'required|string|max:255',
-            'area' => ($isUpdate ? 'sometimes|' : '') . 'nullable|string',
+            'country'  => ($isUpdate ? 'sometimes|' : 'required|') . 'string|max:255',
+            'district' => ($isUpdate ? 'sometimes|' : 'required|') . 'string|max:255',
+            'location' => ($isUpdate ? 'sometimes|' : 'required|') . 'string|max:255',
+            'area'     => 'nullable|string|max:255',
+            'status'   => ['sometimes', Rule::in(['draft', 'submitted', 'canceled'])]
         ];
 
-        $validated = $request->validate($rules);
+        return $request->validate($rules);
+    }
 
-        return $request->only([
-            'country',
-            'district',
-            'location',
-            'area',
+    /**
+     * Beddelidda Status-ka
+     */
+    private function updateStatus(Address $address, string $status): JsonResponse
+    {
+        $this->authorizeOwner($address);
+
+        $address->update(['status' => $status]);
+
+        return response()->json([
+            'success' => true,
+            'message' => "Address is now $status",
+            'status' => $address->status
         ]);
     }
-
-        private function authorizeAddressAccess(Request $request, Address $address)
-    {
-        if ($address->user_id !== $request->user()->id) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Unauthorized. You can only modify your own address',
-            ], 403);
-        }
-
-        return null;
-    }
-
 }
