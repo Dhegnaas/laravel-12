@@ -11,6 +11,47 @@ use Illuminate\Validation\Rule;
 
 class AddressController extends Controller
 {
+        public function pagination(Request $request): JsonResponse
+    {
+
+        $addresses = Address::query() // 1. Bilow query-ga
+            ->with('user:id,name,email') // 2. Eager load user data
+            
+            // 3. Codso filters-ka si xikmad leh adigoo isticmaalaya "when()"
+            ->when($request->country, fn($query, $country) => $query->country($country))
+            ->when($request->status, fn($query, $status) => $query->status($status))
+            ->when($request->search, fn($query, $terms) => $query->search($terms))
+            
+            ->latest() // 4. Kala hormari kuwii ugu dambeeyay
+            ->paginate(15); // 5. Halkan ku samee pagination-ka (15 xariiq boggiiba)
+
+        return response()->json([
+            'success' => true,
+            'data' => $addresses // Laravel wuxuu siinayaa metadata pagination
+        ]);
+    }
+public function filters(Request $request): JsonResponse
+{
+    $request->validate([
+        'status' => 'nullable|in:draft,canceled,submitted',
+        'country' => 'nullable|string',
+        'search' => 'nullable|string',
+    ]);
+
+    $addresses = Address::query()
+        ->with('user:id,name,email')
+        ->when($request->country, fn ($q, $country) => $q->country($country))
+        ->when($request->status, fn ($q, $status) => $q->status($status))
+        ->when($request->search, fn ($q, $terms) => $q->search($terms))
+        ->latest()
+        ->paginate(10);
+
+    return response()->json([
+        'success' => true,
+        'data' => $addresses
+    ]);
+}
+
     /**
      * Tusi dhammaan cinwaannada (Latest First + Pagination)
      */

@@ -42,5 +42,7 @@ Route::middleware('auth:sanctum')->group(function () {
     // Address Status management
     Route::post('/address/{address}/submit', [AddressController::class, 'submit']);
     Route::post('/address/{address}/cancel', [AddressController::class, 'cancel']);
-
+    // Address filtering
+    Route::get('/address/filters', [AddressController::class, 'filters']);
+    Route::get('/address/pagination', [AddressController::class, 'pagination']);
 });
