@@ -5,195 +5,123 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use App\Models\User;
 use Illuminate\Support\Facades\Hash;
-use Illuminate\Support\Facades\Cookie;
-use Illuminate\Validation\Rule;
+use App\Core\Traits\AuditTrailTraits;
+use App\Core\Traits\GlobalTraits;
 use Illuminate\Support\Facades\DB;
 
 
 class UserController extends Controller
 {
-    /**
-     * Display a listing of users
-     */
+    use AuditTrailTraits, GlobalTraits;
+
     public function list()
     {
-        $users = User::all();
-
-        return response()->json([
-            'success' => true,
-            'data' => $users,
-        ]);
+        return User::with(['auditTrails'])->get();
     }
 
-    /**
-     * Display the specified user
-     */
-    public function show(User $user)
+    public function pagination(Request $request)
     {
-        $user = User::find($user->id);
-
-        return response()->json([
-            'success' => true,
-            'data' => $user,
-        ]);
+        $query = User::with('auditTrails')->orderBy('id', 'desc');
+        return $this->paginate($query, $request);
     }
 
+    public function filtration(Request $request)
+    {
+        return $this->filter(User::with('auditTrails'), $request->condition, $request);
+    }
 
-
-    /**
-     * Register a new user
-     */
     public function save(Request $request)
     {
-
-
-        return DB::transaction(function () use ($request) {
-
-            $validateData = $this->validateUserData($request);
-
-            $user = User::create($validateData);
-
+       return DB::transaction(function () use ($request) {
+            $validData = $this->validateData($request);
+            $validData['status'] = 'draft';
+            $user = User::create($validData);
+            $this->auditTrail('save', $user->id, now(), 'user', 'Created');
             return response()->json([
-                'user' => $user,
-                'message' => 'User registered successfully',
-            ], 201);
-
-
+                User::with(['auditTrails', 'role'])->where('id', $user['id'])->first()
+            ]);
         });
     }
 
-    /**
-     * Update the specified user
-     */
+
+    public function show(User $user)
+    {
+        return response()->json([
+            User::with(['auditTrails', 'role'])->where('id', $user->id)->first()
+        ]);
+    }
+
     public function update(Request $request, User $user)
     {
-
-        $user = $request->user();
-
-        if (!$user) {
-            return response()->json([
-                'message' => 'Unauthorized',
-            ], 401);
-        }
-
         return DB::transaction(function () use ($request, $user) {
-
-            $validateData = $this->validateUserData($request, $user);
-
+            $validateData = $this->validateData($request, $user->id);
             $user->update($validateData);
-
-            $user = User::find($user->id);
-
-
-
+            $this->auditTrail('update', $user->id, now(), 'user', 'Updated');
             return response()->json([
-                'data' => $user,
-                'message' => 'User updated successfully',
+                User::with(['auditTrails', 'role'])->where('id', $user['id'])->first()
             ]);
-
         });
     }
 
-    /**
-     * Remove the specified user
-     */
-    public function destroy(User $user, $id)
+
+
+    public function submit(User $user)
     {
-        $user = User::find($user->id);
-        $user->delete();
-
-        return response()->json([
-            'message' => 'User deleted successfully',
-        ]);
-    }
-
-    /**
-     * Update the authenticated user's profile
-     */
-    public function updateProfile(Request $request)
-    {
-        $user = $request->user();
-
-        if (!$user) {
+        return DB::transaction(function () use ($user) {
+            $user->update(['status' => 'submitted']);
+            $this->auditTrail('submit', $user->id, now(), 'user', 'Submitted user');
             return response()->json([
-                'message' => 'Unauthorized',
-            ], 401);
-        }
-
-        return DB::transaction(function () use ($request, $user) {
-            $validateData = $this->validateUserData($request, $user);
-
-            $user->update($validateData);
-
-            // Refresh the user model to get updated data
-            $user->refresh();
-
-            return response()->json([
-                'data' => $user,
-                'message' => 'Profile updated successfully',
+                User::with(['auditTrails', 'role'])->where('id', $user['id'])->first()
             ]);
-
         });
     }
 
-    /**
-     * Delete the authenticated user's account
-     */
-    public function deleteProfile(Request $request)
+
+
+    public function cancel(User $user)
     {
-        $user = $request->user();
+        return DB::transaction(function () use ($user) {
+            $user->update(['status' => 'draft']);
 
-        if (!$user) {
+            $this->auditTrail('cancel', $user->id, now(), 'user', 'Cancelled user');
+
             return response()->json([
-                'message' => 'Unauthorized',
-            ], 401);
-        }
-
-        $user->delete();
-
-        return response()->json([
-            'message' => 'Account deleted successfully',
-        ]);
+                User::with(['auditTrails', 'role'])->where('id', $user['id'])->first()
+            ]);
+        });
     }
 
+  
 
-
-
-    protected function validateUserData(Request $request, User $user = null)
+    public function delete(User $user)
     {
-        // Build validation rules
+        $this->auditTrail('delete', $user['id'], now(), 'user', 'user deleted');
+        return $user->delete();
+    }
+
+    protected function validateData(Request $request, $userId = null)
+    {
+        // Get user ID from request or parameter (for updates)
+        $id = $userId ?? $request->id ?? 'NULL';
+        
         $rules = [
-            'name' => 'required|string|max:255',
-            'email' => ['required', 'string', 'email', 'max:255'],
+            'fullname' => 'nullable|string|max:255',
+            'email' => "required|email|unique:users,email,{$id},id",
+            'phone' => 'nullable|string|max:255',
+            'role_id' => 'required|exists:roles,id',
+            'is_blocked' => 'nullable|boolean',
         ];
 
-        // Password validation: required for new users, optional for updates
-        if ($user) {
-            // For updates, password is optional
-            $rules['password'] = 'sometimes|string|min:4|confirmed';
-        } else {
-            // For new users, password is required
-            $rules['password'] = 'required|string|min:4|confirmed';
-        }
-
-        // For updates, ignore current user's email in uniqueness check
-        if ($user) {
-            $rules['email'][] = Rule::unique('users')->ignore($user->id);
-        } else {
-            // For new users, email must be unique
-            $rules['email'][] = 'unique:users';
+        // Add password validation if provided
+        if ($request->filled('password')) {
+            $rules['password'] = 'required|string|min:6';
         }
 
         // Validate the request and get validated data
         $validated = $request->validate($rules);
 
-        // Hash the password if provided
-        if (isset($validated['password'])) {
-            $validated['password'] = Hash::make($validated['password']);
-        }
-
-        // Remove password_confirmation as it's only for validation
-        unset($validated['password_confirmation']);
+        // Remove confirm_password from validated data as it's not stored
+        unset($validated['confirm_password']);
 
         return $validated;
     }

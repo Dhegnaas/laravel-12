@@ -13,7 +13,7 @@ class ProductController extends Controller
     public function index()
     {
         $products = Product::with('user')->get();
-        
+
         return response()->json([
             'success' => true,
             'data' => $products,
@@ -47,7 +47,7 @@ class ProductController extends Controller
     public function show(Product $product)
     {
         $product->load('user');
-        
+
         return response()->json([
             'success' => true,
             'data' => $product,
@@ -65,8 +65,11 @@ class ProductController extends Controller
             return $unauthorized;
         }
 
-        $validatedData = $this->validateProductData($request, true);
-        $product->update($validatedData);
+        $validData = $this->validateProductData($request);
+        $validData['status'] = 'draft';
+
+
+        $product->update($validData);
         $product->load('user');
 
         return response()->json([
