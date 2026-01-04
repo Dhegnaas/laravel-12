@@ -22,9 +22,7 @@ class AuthController extends Controller
     {
         $this->auth = $auth;
     }
-    /**
-     * Login user and create token
-     */
+ 
     public function login(Request $request)
     {
         $credentials = $request->validate([
@@ -32,36 +30,46 @@ class AuthController extends Controller
             'password' => 'required',
         ]);
 
+       
         $user = User::where('email', $request->email)->first();
 
+        
         if (!$user || !Hash::check($request->password, $user->password)) {
             throw ValidationException::withMessages([
                 'email' => ['The provided credentials are incorrect.'],
             ]);
         }
 
-
-        if (Auth::attempt($credentials)) {
-            $token = $user->createToken('token')->plainTextToken;
-            $user = User::find(Auth::user()->id);
-            $cookies = Cookie::make('jwt', $token);
-            session([
-                'login_time' => now(),
-                'last_activity' => now()
+        if ($user->is_blocked) {
+            throw ValidationException::withMessages([
+                'email' => ['Your account has been blocked. Please contact support.'],
             ]);
-            return response()->json(['code' => 200, 'massage' => 'Authentication successful.', 'token' => $token], 200)->withCookie($cookies);
-
         }
 
-        return response()->json([
-            'message' => 'The provided credentials do not match our records.',
-        ], 422);
+        
+        if ($user->status !== 'submitted') {
+            throw ValidationException::withMessages([
+                'email' => ['Your account is not active. Please wait for approval.'],
+            ]);
+        }
 
+        
+        Auth::login($user);
+        $token = $user->createToken('token')->plainTextToken;
+        $cookies = Cookie::make('jwt', $token);
+        session([
+            'login_time' => now(),
+            'last_activity' => now()
+        ]);
+        
+        return response()->json([
+            'code' => 200,
+            'message' => 'Authentication successful.',
+            'token' => $token
+        ], 200)->withCookie($cookies);
     }
 
-    /**
-     * Logout user (Revoke the token)
-     */
+   
     public function logout(Request $request)
     {
         try {

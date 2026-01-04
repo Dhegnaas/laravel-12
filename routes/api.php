@@ -17,17 +17,20 @@ Route::middleware('auth:sanctum')->group(function () {
     // Auth routes
     Route::post('/logout', [AuthController::class, 'logout']);
     Route::get('/user', [AuthController::class, 'user']);
-    Route::put('/user', [UserController::class, 'updateProfile']);
-    Route::patch('/user', [UserController::class, 'updateProfile']);
-    Route::delete('/user', [UserController::class, 'deleteProfile']);
     
     // User routes
-    Route::post('/user/save', [UserController::class, 'save']);
+    Route::post('/users', [UserController::class, 'save']);
     Route::get('/users', [UserController::class, 'list']);
-    Route::get('/users/{id}', [UserController::class, 'show']);
-    Route::put('/users/{id}', [UserController::class, 'update']);
-    Route::patch('/users/{id}', [UserController::class, 'update']);
-    Route::delete('/users/{id}', [UserController::class, 'destroy']);
+    Route::get('/users/pagination', [UserController::class, 'pagination']);
+    Route::get('/users/filtration', [UserController::class, 'filtration']);
+    Route::get('/users/{user}', [UserController::class, 'show']);
+    Route::put('/users/{user}', [UserController::class, 'update']);
+    // Route::patch('/users/{user}', [UserController::class, 'update']);
+    Route::delete('/users/{user}', [UserController::class, 'destroy']);
+    
+    // User status management
+    Route::post('/users/{user}/submit', [UserController::class, 'submit']);
+    Route::post('/users/{user}/cancel', [UserController::class, 'cancel']);
     
     // Product routes
     Route::apiResource('products', ProductController::class);
