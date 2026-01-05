@@ -6,6 +6,7 @@ use App\Http\Controllers\AuthController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\ProductController;
 use App\Http\Controllers\AddressController;
+use App\Http\Controllers\JobPostsController;
 
 
 // Public routes
@@ -48,4 +49,15 @@ Route::middleware('auth:sanctum')->group(function () {
     // Address filtering
     Route::get('/address/filters', [AddressController::class, 'filters']);
     Route::get('/address/pagination', [AddressController::class, 'pagination']);
+
+    // Job routes
+    route::get('/jobs', [JobPostsController::class, 'index']);
+    route::post('/jobs', [JobPostsController::class, 'store']);
+    route::get('/jobs/pagination', [JobPostsController::class, 'pagination']);
+    route::get('/jobs/filtration', [JobPostsController::class, 'filtration']);
+    route::get('/jobs/{jobs}', [JobPostsController::class, 'show']);
+    route::put('/jobs/{jobs}', [JobPostsController::class, 'update']);
+    route::delete('/jobs/{jobs}', [JobPostsController::class, 'destroy']);
+    route::post('/jobs/{jobs}/submit', [JobPostsController::class, 'submit']);
+    route::post('/jobs/{jobs}/cancel', [JobPostsController::class, 'cancel']);
 });
