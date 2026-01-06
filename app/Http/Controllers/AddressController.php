@@ -46,7 +46,7 @@ class AddressController extends Controller
     public function show(Address $address)
     {
         return response()->json(
-            $address->load(['auditTrails'])
+            Address::with(['auditTrails'])->where('id', $address->id)->first()
         );
     }   
     /**

@@ -44,7 +44,7 @@ class ProductController extends Controller
     public function show(Product $product)
     {
         return response()->json(
-            $product->load(['auditTrails'])
+            Product::with(['auditTrails'])->where('id', $product->id)->first()
         );
     }
 
