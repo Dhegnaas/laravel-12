@@ -15,7 +15,7 @@ class JobPostsController extends Controller
     /**
      * Display a listing of the resource.
      */
-    public function index()
+    public function list()
     {
         return JobPosts::with(['auditTrails'])->get();
 
@@ -33,7 +33,7 @@ class JobPostsController extends Controller
     /**
      * Store a newly created resource in storage.
      */
-    public function store(Request $request)
+    public function save(Request $request)
     {
         return DB::transaction(function () use ($request) {
             $validData = $this->validateData($request);
@@ -98,7 +98,7 @@ class JobPostsController extends Controller
     /**
      * Remove the specified resource from storage.
      */
-    public function destroy(JobPosts $JobPosts)
+    public function delete(JobPosts $JobPosts)
     {
         $this->auditTrail('delete', $JobPosts->id, now(), 'job', 'Deleted');
         return $JobPosts->delete();
