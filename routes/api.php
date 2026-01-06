@@ -34,7 +34,18 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/users/{user}/cancel', [UserController::class, 'cancel']);
     
     // Product routes
-    Route::apiResource('products', ProductController::class);
+    route::get('/products', [ProductController::class, 'index']);
+    route::post('/products', [ProductController::class, 'store']);
+    route::get('/products/pagination', [ProductController::class, 'pagination']);
+    route::get('/products/filtration', [ProductController::class, 'filtration']);
+    route::get('/products/{product}', [ProductController::class, 'show']);
+    Route::put('/products/{product}', [ProductController::class, 'update']);
+    route::delete('/products/{product}', [ProductController::class, 'destroy']);
+    route::post('/products/{product}/submit', [ProductController::class, 'submit']);
+    route::post('/products/{product}/cancel', [ProductController::class, 'cancel']);    
+
+
+
     // Address routes (Si gaar ah loo qoray, sidaad codsatay)
     Route::get('/address', [AddressController::class, 'index']);
     Route::post('/address', [AddressController::class, 'store']);

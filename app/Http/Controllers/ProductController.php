@@ -4,20 +4,16 @@ namespace App\Http\Controllers;
 
 use App\Models\Product;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use App\Core\Traits\AuditTrailTraits;
+use App\Core\Traits\GlobalTraits;
 
 class ProductController extends Controller
 {
-    /**
-     * Display a listing of the resource.
-     */
+    use AuditTrailTraits, GlobalTraits;
     public function index()
     {
-        $products = Product::with('user')->get();
-
-        return response()->json([
-            'success' => true,
-            'data' => $products,
-        ]);
+        return Product::with(['auditTrails'])->get();
     }
 
     /**
@@ -25,33 +21,31 @@ class ProductController extends Controller
      */
     public function store(Request $request)
     {
-        $validatedData = $this->validateProductData($request);
-
-        $product = Product::create([
-            ...$validatedData,
-            'user_id' => $request->user()->id,
-        ]);
-
-        $product->load('user');
-
-        return response()->json([
-            'success' => true,
-            'message' => 'Product created successfully',
-            'data' => $product,
-        ], 201);
+        return DB::transaction(function () use ($request) {
+            $validData = $this->validateData($request);
+            $validData['status'] = 'draft';
+            $validData['created_by'] = auth()->id();
+            $product = Product::create($validData);
+            $this->auditTrail('save', $product->id, now(), 'product', 'Created');
+            return response()->json([
+                Product::with(['auditTrails'])->where('id', $product->id)->first()
+            ]);
+        });
     }
-
-    /**
-     * Display the specified resource.
-     */
+    public function pagination(Request $request)
+    {
+        $query = Product::with('auditTrails')->orderBy('id', 'desc');
+        return $this->paginate($query, $request);
+    }
+    public function filtration(Request $request)
+    {
+        return $this->filter(Product::with('auditTrails'), $request->condition, $request);
+    }
     public function show(Product $product)
     {
-        $product->load('user');
-
-        return response()->json([
-            'success' => true,
-            'data' => $product,
-        ]);
+        return response()->json(
+            $product->load(['auditTrails'])
+        );
     }
 
     /**
@@ -59,24 +53,35 @@ class ProductController extends Controller
      */
     public function update(Request $request, Product $product)
     {
-        // Check if user owns the product
-        $unauthorized = $this->authorizeProductAccess($request, $product);
-        if ($unauthorized) {
-            return $unauthorized;
-        }
+        return DB::transaction(function () use ($request, $product) {
+            $validateData = $this->validateData($request, $product->id);
+            $product->update($validateData);
+            $this->auditTrail('update', $product->id, now(), 'product', 'Updated');
+            return response()->json([
+                Product::with(['auditTrails'])->where('id', $product->id)->first()
+            ]);
+        });
+    }
 
-        $validData = $this->validateProductData($request);
-        $validData['status'] = 'draft';
-
-
-        $product->update($validData);
-        $product->load('user');
-
-        return response()->json([
-            'success' => true,
-            'message' => 'Product updated successfully',
-            'data' => $product,
-        ]);
+    public function submit(Request $request, Product $product)
+    {
+        return DB::transaction(function () use ($request, $product) {
+            $product->update(['status' => 'submitted']);
+            $this->auditTrail('submit', $product->id, now(), 'product', 'Submitted');
+            return response()->json([
+                Product::with(['auditTrails'])->where('id', $product->id)->first()
+            ]);
+        });
+    }
+    public function cancel(Request $request, Product $product)
+    {
+        return DB::transaction(function () use ($request, $product) {
+            $product->update(['status' => 'canceled']);
+            $this->auditTrail('cancel', $product->id, now(), 'product', 'Canceled');
+            return response()->json([
+                Product::with(['auditTrails'])->where('id', $product->id)->first()
+            ]);
+        });
     }
 
     /**
@@ -84,64 +89,18 @@ class ProductController extends Controller
      */
     public function destroy(Request $request, Product $product)
     {
-        // Check if user owns the product
-        $unauthorized = $this->authorizeProductAccess($request, $product);
-        if ($unauthorized) {
-            return $unauthorized;
-        }
-
+        $this->auditTrail('delete', $product->id, now(), 'product', 'Deleted');
         $product->delete();
-
-        return response()->json([
-            'success' => true,
-            'message' => 'Product deleted successfully',
-        ]);
+        return response()->json(['message' => 'Product deleted successfully.']);
     }
-
-    /**
-     * Validate product data for create/update operations
-     *
-     * @param Request $request
-     * @param bool $isUpdate Whether this is an update operation (uses 'sometimes' rules)
-     * @return array Validated data ready for database operations
-     */
-    private function validateProductData(Request $request, bool $isUpdate = false): array
+    protected function validateData(Request $request, $id = null)
     {
+        $id = $product->id ?? $request->id ?? null;
         $rules = [
-            'name' => ($isUpdate ? 'sometimes|' : '') . 'required|string|max:255',
+            'name' => 'required|string|max:255',
+            'price' => 'required|numeric|min:0',
             'description' => 'nullable|string',
-            'price' => ($isUpdate ? 'sometimes|' : '') . 'required|numeric|min:0',
-            'featured_image' => 'nullable|string',
-            'featured_image_organizational_name' => 'nullable|string',
         ];
-
-        $validated = $request->validate($rules);
-
-        return $request->only([
-            'name',
-            'description',
-            'price',
-            'featured_image',
-            'featured_image_organizational_name',
-        ]);
-    }
-
-    /**
-     * Check if the authenticated user owns the product
-     *
-     * @param Request $request
-     * @param Product $product
-     * @return \Illuminate\Http\JsonResponse|null Returns error response if unauthorized, null if authorized
-     */
-    private function authorizeProductAccess(Request $request, Product $product)
-    {
-        if ($product->user_id !== $request->user()->id) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Unauthorized. You can only modify your own products.',
-            ], 403);
-        }
-
-        return null;
+        return $request->validate($rules);
     }
 }

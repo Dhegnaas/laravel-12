@@ -9,20 +9,16 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class Product extends Model
 {
-    protected $fillable = [
-        'name',
-        'user_id',
-        'description',
-        'price',
-        'featured_image',
-        'featured_image_organizational_name',
-    ];      
+    protected $table = 'products';
+    protected $guarded = [];
 
-
-
-    public function user()
+    public function creator(): BelongsTo
     {
-        return $this->belongsTo(User::class);
+        return $this->belongsTo(User::class, 'created_by');
     }
-        
+
+        public function auditTrails()
+    {
+        return $this->hasMany(AuditTrail::class, 'action_id', 'id')->where('related_to', 'product')->with('user');
+    }
 }
