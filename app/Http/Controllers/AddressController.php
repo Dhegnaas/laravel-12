@@ -12,14 +12,25 @@ class AddressController extends Controller
 {
     use AuditTrailTraits, GlobalTraits;
 
-    public function index()
+    public function list()
     {
         return Address::with(['auditTrails'])->get();
+    }
+
+        public function pagination(Request $request)
+    {   
+        $query = Address::with('auditTrails')->orderBy('id', 'desc');
+        return $this->paginate($query, $request);
+    }
+
+    public function filtration(Request $request)
+    {
+        return $this->filter(Address::with('auditTrails'), $request->condition, $request);
     }
     /**
      * Store a newly created resource in storage.
      */
-    public function store(Request $request)
+    public function save(Request $request)
     {
         return DB::transaction(function () use ($request) {
             $validData = $this->validateData($request);
@@ -31,15 +42,6 @@ class AddressController extends Controller
                 Address::with(['auditTrails'])->where('id', $address->id)->first()
             ]);
         });
-    }
-    public function pagination(Request $request)
-    {   
-        $query = Address::with('auditTrails')->orderBy('id', 'desc');
-        return $this->paginate($query, $request);
-    }
-    public function filtration(Request $request)
-    {
-        return $this->filter(Address::with('auditTrails'), $request->condition, $request);
     }
     public function show(Address $address)
     {
@@ -60,11 +62,27 @@ class AddressController extends Controller
                 Address::with(['auditTrails'])->where('id', $address->id)->first()
             ]);
         });
-    }   
+    }
+    public function submit(Request $request, Address $address)
+    {
+        $address->update(['status' => 'submitted']);
+        $this->auditTrail('submit', $address->id, now(), 'address', 'Submitted');
+        return response()->json([
+            Address::with(['auditTrails'])->where('id', $address->id)->first()
+        ]);
+    }
+    public function cancel(Request $request, Address $address)
+    {
+        $address->update(['status' => 'canceled']);
+        $this->auditTrail('cancel', $address->id, now(), 'address', 'Canceled');
+        return response()->json([
+            Address::with(['auditTrails'])->where('id', $address->id)->first()
+        ]);
+    }              
     /**
      * Remove the specified resource from storage.
      */
-    public function destroy(Request $request, Address $address)
+    public function delete(Request $request, Address $address)
     {
         $this->auditTrail('delete', $address->id, now(), 'address', 'Deleted');
         $address->delete();
@@ -72,6 +90,7 @@ class AddressController extends Controller
     }
     protected function validateData(Request $request, $id = null)
     {
+        $id = $address->id ?? $request->id ?? null;
         $Rules =[
             'country' => 'required|string|max:100',
             'district' => 'required|string|max:100',

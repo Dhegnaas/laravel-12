@@ -11,15 +11,24 @@ use App\Core\Traits\GlobalTraits;
 class ProductController extends Controller
 {
     use AuditTrailTraits, GlobalTraits;
-    public function index()
+    public function list()
     {
         return Product::with(['auditTrails'])->get();
     }
+        public function pagination(Request $request)
+    {
+        $query = Product::with('auditTrails')->orderBy('id', 'desc');
+        return $this->paginate($query, $request);
+    }
+    public function filtration(Request $request)
+    {
+        return $this->filter(Product::with('auditTrails'), $request->condition, $request);
+    }
 
     /**
-     * Store a newly created resource in storage.
+     * save a newly created resource in storage.
      */
-    public function store(Request $request)
+    public function save(Request $request)
     {
         return DB::transaction(function () use ($request) {
             $validData = $this->validateData($request);
@@ -31,15 +40,6 @@ class ProductController extends Controller
                 Product::with(['auditTrails'])->where('id', $product->id)->first()
             ]);
         });
-    }
-    public function pagination(Request $request)
-    {
-        $query = Product::with('auditTrails')->orderBy('id', 'desc');
-        return $this->paginate($query, $request);
-    }
-    public function filtration(Request $request)
-    {
-        return $this->filter(Product::with('auditTrails'), $request->condition, $request);
     }
     public function show(Product $product)
     {
@@ -87,7 +87,7 @@ class ProductController extends Controller
     /**
      * Remove the specified resource from storage.
      */
-    public function destroy(Request $request, Product $product)
+    public function delete(Request $request, Product $product)
     {
         $this->auditTrail('delete', $product->id, now(), 'product', 'Deleted');
         $product->delete();
