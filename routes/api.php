@@ -55,9 +55,9 @@ Route::middleware('auth:sanctum')->group(function () {
     route::post('/jobs', [JobPostsController::class, 'store']);
     route::get('/jobs/pagination', [JobPostsController::class, 'pagination']);
     route::get('/jobs/filtration', [JobPostsController::class, 'filtration']);
-    route::get('/jobs/{jobs}', [JobPostsController::class, 'show']);
-    route::put('/jobs/{jobs}', [JobPostsController::class, 'update']);
-    route::delete('/jobs/{jobs}', [JobPostsController::class, 'destroy']);
-    route::post('/jobs/{jobs}/submit', [JobPostsController::class, 'submit']);
-    route::post('/jobs/{jobs}/cancel', [JobPostsController::class, 'cancel']);
+    route::get('/jobs/{JobPosts}', [JobPostsController::class, 'show']);
+    Route::put('/jobs/{JobPosts}', [JobPostsController::class, 'update']);
+    route::delete('/jobs/{JobPosts}', [JobPostsController::class, 'destroy']);
+    route::post('/jobs/{JobPosts}/submit', [JobPostsController::class, 'submit']);
+    route::post('/jobs/{JobPosts}/cancel', [JobPostsController::class, 'cancel']);
 });
