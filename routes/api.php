@@ -47,19 +47,17 @@ Route::middleware('auth:sanctum')->group(function () {
 
 
     // Address routes (Si gaar ah loo qoray, sidaad codsatay)
-    Route::get('/address', [AddressController::class, 'index']);
-    Route::post('/address', [AddressController::class, 'store']);
-    Route::get('/address/{address}', [AddressController::class, 'show']);
-    Route::put('/address/{address}', [AddressController::class, 'update']);
-    Route::patch('/address/{address}', [AddressController::class, 'update']);
-    Route::delete('/address/{address}', [AddressController::class, 'destroy']);
+    route::get('/addresses', [AddressController::class, 'index']);
+    route::post('/addresses', [AddressController::class, 'store']);
+    route::get('/addresses/pagination', [AddressController::class, 'pagination']);
+    route::get('/addresses/filtration', [AddressController::class, 'filtration']);
+    route::get('/addresses/{address}', [AddressController::class, 'show']);
+    Route::put('/addresses/{address}', [AddressController::class, 'update']);
+    route::delete('/addresses/{address}', [AddressController::class, 'destroy']);
+    route::post('/addresses/{address}/submit', [AddressController::class, 'submit']);
+    route::post('/addresses/{address}/cancel', [AddressController::class, 'cancel']);
 
-    // Address Status management
-    Route::post('/address/{address}/submit', [AddressController::class, 'submit']);
-    Route::post('/address/{address}/cancel', [AddressController::class, 'cancel']);
-    // Address filtering
-    Route::get('/address/filters', [AddressController::class, 'filters']);
-    Route::get('/address/pagination', [AddressController::class, 'pagination']);
+
 
     // Job routes
     route::get('/jobs', [JobPostsController::class, 'index']);
