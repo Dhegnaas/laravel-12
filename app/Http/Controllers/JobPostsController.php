@@ -55,7 +55,7 @@ class JobPostsController extends Controller
     {
         // Kani waa qaabka saxda ah:
         return response()->json(
-            $JobPosts->load(['auditTrails']) // Si toos ah u soo celi Object-ka
+        JobPosts::with(['auditTrails'])->where('id', $JobPosts->id)->first()
         );
     }
 
