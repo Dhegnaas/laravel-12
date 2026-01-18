@@ -7,6 +7,7 @@ use App\Http\Controllers\UserController;
 use App\Http\Controllers\ProductController;
 use App\Http\Controllers\AddressController;
 use App\Http\Controllers\JobPostsController;
+use App\Http\Controllers\AccountsController;
 
 
 // Public routes
@@ -69,4 +70,15 @@ Route::middleware('auth:sanctum')->group(function () {
     route::delete('/jobs/{JobPosts}', [JobPostsController::class, 'delete']);
     route::post('/jobs/{JobPosts}/submit', [JobPostsController::class, 'submit']);
     route::post('/jobs/{JobPosts}/cancel', [JobPostsController::class, 'cancel']);
-});
+
+    //account
+    route::get('/accounts',[AccountsController::class, 'list']);
+    route::post('/accounts', [AccountsController::class, 'save']);
+    route::get('/accounts/pagination', [AccountsController::class, 'pagination']);
+    route::get('/accounts/filtration', [AccountsController::class, 'filtration']);
+    route::put('accounts/{accounts}', [AccountsController::class, 'update']);
+    route::delete('accounts/{accounts}', [AccountsController::class, 'delete']);
+    route::post('accounts/{accounts}/submit', [AccountsController::class, 'submit']);
+    route::post('accounts/{accounts}/cancel', [AccountsController::class, 'cancel']);
+
+    });
