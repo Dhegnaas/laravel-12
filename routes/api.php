@@ -76,9 +76,9 @@ Route::middleware('auth:sanctum')->group(function () {
     route::post('/accounts', [AccountsController::class, 'save']);
     route::get('/accounts/pagination', [AccountsController::class, 'pagination']);
     route::get('/accounts/filtration', [AccountsController::class, 'filtration']);
-    route::put('accounts/{accounts}', [AccountsController::class, 'update']);
-    route::delete('accounts/{accounts}', [AccountsController::class, 'delete']);
-    route::post('accounts/{accounts}/submit', [AccountsController::class, 'submit']);
-    route::post('accounts/{accounts}/cancel', [AccountsController::class, 'cancel']);
+    route::put('accounts/{account}', [AccountsController::class, 'update']);
+    route::delete('accounts/{account}', [AccountsController::class, 'delete']);
+    route::post('accounts/{account}/submit', [AccountsController::class, 'submit']);
+    route::post('accounts/{account}/cancel', [AccountsController::class, 'cancel']);
 
     });
